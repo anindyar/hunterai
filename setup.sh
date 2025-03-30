@@ -146,7 +146,7 @@ fi
 # Create necessary directories
 echo -e "${YELLOW}Creating necessary directories...${NC}"
 mkdir -p data/elasticsearch
-mkdir -p data/kibana
+mkdir -p data/kibana/config
 mkdir -p data/fleet
 mkdir -p data/npm
 mkdir -p cloudflared
@@ -159,7 +159,7 @@ chmod -R 777 data/elasticsearch
 echo -e "${YELLOW}Pulling Docker images...${NC}"
 $DOCKER_COMPOSE_CMD pull
 
-# Start Elasticsearch first to create service account
+# Start Elasticsearch first to create service accounts
 echo -e "${YELLOW}Starting Elasticsearch...${NC}"
 $DOCKER_COMPOSE_CMD up -d elasticsearch
 
@@ -167,12 +167,21 @@ $DOCKER_COMPOSE_CMD up -d elasticsearch
 echo -e "${YELLOW}Waiting for Elasticsearch to be ready...${NC}"
 sleep 30
 
-# Create Kibana service account and get token
-echo -e "${YELLOW}Creating Kibana service account...${NC}"
+# Create service accounts and get tokens
+echo -e "${YELLOW}Creating service accounts...${NC}"
+
+# Create Kibana service account token
 KIBANA_SERVICE_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-service-tokens create elastic/kibana kibana-token | grep "SERVICE_TOKEN" | awk '{print $3}')
 
-# Create Kibana config directory if it doesn't exist
-mkdir -p data/kibana/config
+# Create Fleet service account token
+FLEET_SERVICE_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-service-tokens create elastic/fleet fleet-token | grep "SERVICE_TOKEN" | awk '{print $3}')
+
+# Create Fleet enrollment token
+FLEET_ENROLLMENT_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s fleet-server | grep "token" | awk '{print $3}')
+
+# Update .env file with service tokens
+sed -i "s/FLEET_SERVER_TOKEN=.*/FLEET_SERVICE_TOKEN=${FLEET_SERVICE_TOKEN}/" .env
+echo "FLEET_ENROLLMENT_TOKEN=${FLEET_ENROLLMENT_TOKEN}" >> .env
 
 # Create Kibana configuration file with service account token
 cat > data/kibana/config/kibana.yml << EOL
@@ -228,6 +237,12 @@ Elastic Stack Credentials:
 ------------------------
 Username: elastic
 Password: ${ELASTIC_PASSWORD}
+
+Service Account Tokens:
+--------------------
+Kibana: ${KIBANA_SERVICE_TOKEN}
+Fleet: ${FLEET_SERVICE_TOKEN}
+Fleet Enrollment: ${FLEET_ENROLLMENT_TOKEN}
 
 Nginx Proxy Manager Credentials:
 -----------------------------

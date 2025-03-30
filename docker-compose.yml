@@ -17,10 +17,8 @@ services:
 
   kibana:
     image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION}
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_USERNAME=elastic
-      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
+    volumes:
+      - ./data/kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml
     ports:
       - "5601:5601"
     depends_on:
@@ -33,10 +31,9 @@ services:
     environment:
       - FLEET_SERVER_ENABLE=true
       - FLEET_SERVER_ELASTICSEARCH_HOST=http://elasticsearch:9200
-      - FLEET_SERVER_ELASTICSEARCH_USERNAME=elastic
-      - FLEET_SERVER_ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
-      - FLEET_SERVER_SERVICE_TOKEN=${FLEET_SERVER_TOKEN}
+      - FLEET_SERVER_SERVICE_TOKEN=${FLEET_SERVICE_TOKEN}
       - FLEET_SERVER_HOST=${FLEET_SERVER_HOST}
+      - FLEET_SERVER_POLICY_ID=fleet-server-policy
     ports:
       - "8220:8220"
     depends_on:
@@ -47,11 +44,9 @@ services:
   elastic-agent:
     image: docker.elastic.co/beats/elastic-agent:${ELASTIC_VERSION}
     environment:
-      - FLEET_SERVER_ELASTICSEARCH_HOST=http://elasticsearch:9200
-      - FLEET_SERVER_ELASTICSEARCH_USERNAME=elastic
-      - FLEET_SERVER_ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
       - FLEET_SERVER_HOST=${FLEET_SERVER_HOST}
-      - FLEET_SERVER_SERVICE_TOKEN=${FLEET_SERVER_TOKEN}
+      - FLEET_ENROLLMENT_TOKEN=${FLEET_ENROLLMENT_TOKEN}
+      - FLEET_SERVER=http://fleet-server:8220
     depends_on:
       - fleet-server
     networks:
