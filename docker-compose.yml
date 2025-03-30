@@ -18,12 +18,15 @@ services:
   kibana:
     image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION}
     environment:
-      - ELASTICSEARCH_HOSTS=["http://elasticsearch:9200"]
-      - ELASTICSEARCH_SERVICE_ACCOUNT_TOKEN=${KIBANA_SERVICE_TOKEN}
-      - ELASTICSEARCH_SSL_VERIFICATIONMODE=none
-      - XPACK_SECURITY_ENCRYPTIONKEY=a7a99d25df98e0d78c8974d3475164cf
-      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=a7a99d25df98e0d78c8974d3475164cf
-      - XPACK_REPORTING_ENCRYPTIONKEY=a7a99d25df98e0d78c8974d3475164cf
+      - SERVER_NAME=kibana
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=5601
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_SERVICEACCOUNTTOKEN=${KIBANA_SERVICE_TOKEN}
+      - XPACK_SECURITY_ENABLED=true
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=xpack.encryptedsavedobjects.encryptionkey
+      - XPACK_REPORTING_ENCRYPTIONKEY=xpack.reporting.encryptionkey
+      - XPACK_SECURITY_ENCRYPTIONKEY=xpack.security.encryptionkey
       - NODE_OPTIONS=--openssl-legacy-provider
     ports:
       - "5601:5601"

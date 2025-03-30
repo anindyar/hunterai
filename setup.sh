@@ -156,14 +156,45 @@ done
 # Create service accounts and get tokens
 echo -e "${YELLOW}Creating service accounts...${NC}"
 
+# Create Kibana service account
+echo -e "${YELLOW}Creating Kibana service account...${NC}"
+curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/kibana -d '{
+  "roles": [ "kibana_system" ]
+}'
+
+# Create Fleet service account
+echo -e "${YELLOW}Creating Fleet service account...${NC}"
+curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet -d '{
+  "roles": [ "fleet_system" ]
+}'
+
+# Create Fleet Server service account
+echo -e "${YELLOW}Creating Fleet Server service account...${NC}"
+curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet-server -d '{
+  "roles": [ "fleet_server" ]
+}'
+
+sleep 5
+
 # Create Kibana service account token
+echo -e "${YELLOW}Creating Kibana service token...${NC}"
 KIBANA_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/kibana/credential/token | jq -r '.token.value')
 
 # Create Fleet service account token
+echo -e "${YELLOW}Creating Fleet service token...${NC}"
 FLEET_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet/credential/token | jq -r '.token.value')
 
 # Create Fleet enrollment token
+echo -e "${YELLOW}Creating Fleet enrollment token...${NC}"
 FLEET_ENROLLMENT_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet-server/credential/token | jq -r '.token.value')
+
+# Verify tokens were created
+if [ -z "$KIBANA_SERVICE_TOKEN" ] || [ -z "$FLEET_SERVICE_TOKEN" ] || [ -z "$FLEET_ENROLLMENT_TOKEN" ]; then
+    echo -e "${RED}Failed to create service tokens. Please check Elasticsearch logs.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Successfully created service accounts and tokens${NC}"
 
 # Update .env with service tokens
 cat >> .env << EOL
