@@ -24,6 +24,21 @@ else
     exit 1
 fi
 
+# Check if cloudflared is installed
+if ! command -v cloudflared &> /dev/null; then
+    echo -e "${YELLOW}Installing cloudflared...${NC}"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        brew install cloudflared
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        sudo dpkg -i cloudflared.deb
+        rm cloudflared.deb
+    else
+        echo -e "${RED}Unsupported operating system. Please install cloudflared manually.${NC}"
+        exit 1
+    fi
+fi
+
 # Get Elastic Stack version
 echo -e "${YELLOW}Available Elastic Stack versions:${NC}"
 echo -e "1. 8.17.0 (Latest stable)"
@@ -50,26 +65,42 @@ while true; do
     esac
 done
 
-# Function to validate domain name
-validate_domain() {
-    local domain=$1
-    # Very basic domain validation
-    if [[ "$domain" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$ ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
 # Get domain name from user
 while true; do
     read -p "Enter your domain name (e.g., example.com): " DOMAIN
-    if validate_domain "$DOMAIN"; then
+    if [[ -n "$DOMAIN" ]]; then
         break
     else
-        echo -e "${RED}Invalid domain name. Please try again.${NC}"
+        echo -e "${RED}Domain name cannot be empty. Please try again.${NC}"
     fi
 done
+
+# Create subdomains
+KIBANA_DOMAIN="kibana.${DOMAIN}"
+FLEET_DOMAIN="fleet.${DOMAIN}"
+
+# Cloudflare setup
+echo -e "${YELLOW}Setting up Cloudflare...${NC}"
+
+# Check if user is logged in to Cloudflare
+if ! cloudflared tunnel list &> /dev/null; then
+    echo -e "${YELLOW}Please log in to Cloudflare...${NC}"
+    cloudflared login
+fi
+
+# Create tunnel
+echo -e "${YELLOW}Creating Cloudflare tunnel...${NC}"
+TUNNEL_NAME="elastic-stack-$(date +%s)"
+cloudflared tunnel create $TUNNEL_NAME
+
+# Get tunnel ID and token
+TUNNEL_ID=$(cloudflared tunnel list | grep $TUNNEL_NAME | awk '{print $1}')
+TUNNEL_TOKEN=$(cloudflared tunnel token $TUNNEL_ID)
+
+# Create DNS records
+echo -e "${YELLOW}Creating DNS records...${NC}"
+cloudflared tunnel route dns $TUNNEL_ID $KIBANA_DOMAIN
+cloudflared tunnel route dns $TUNNEL_ID $FLEET_DOMAIN
 
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
@@ -81,10 +112,6 @@ if [ ! -f .env ]; then
     FLEET_SERVER_TOKEN=$(openssl rand -base64 32)
     NPM_ADMIN_PASSWORD=$(openssl rand -base64 32)
     
-    # Create subdomains
-    KIBANA_DOMAIN="kibana.${DOMAIN}"
-    FLEET_DOMAIN="fleet.${DOMAIN}"
-    
     cat > .env << EOL
 # Elastic Stack Configuration
 ELASTIC_VERSION=${ELASTIC_VERSION}
@@ -94,10 +121,11 @@ FLEET_SERVER_TOKEN=${FLEET_SERVER_TOKEN}
 FLEET_SERVER_HOST=${FLEET_DOMAIN}
 
 # Cloudflare Configuration
-CLOUDFLARE_TOKEN=your_cloudflare_token_here
+CLOUDFLARE_TOKEN=${TUNNEL_TOKEN}
 CLOUDFLARE_DOMAIN=${DOMAIN}
 KIBANA_DOMAIN=${KIBANA_DOMAIN}
 FLEET_DOMAIN=${FLEET_DOMAIN}
+TUNNEL_ID=${TUNNEL_ID}
 
 # Nginx Proxy Manager Configuration
 NPM_ADMIN_EMAIL=admin@${DOMAIN}
@@ -106,12 +134,18 @@ EOL
     echo -e "${GREEN}Created .env file with generated credentials.${NC}"
 fi
 
+# Load environment variables
+if [ -f .env ]; then
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
 # Create necessary directories
 echo -e "${YELLOW}Creating necessary directories...${NC}"
 mkdir -p data/elasticsearch
 mkdir -p data/kibana
 mkdir -p data/fleet
 mkdir -p data/npm
+mkdir -p cloudflared
 
 # Set proper permissions
 echo -e "${YELLOW}Setting proper permissions...${NC}"
@@ -144,13 +178,32 @@ echo -e "Email: admin@${DOMAIN}"
 echo -e "Password: ${NPM_ADMIN_PASSWORD}"
 
 echo -e "\n${YELLOW}Next steps:${NC}"
-echo -e "1. Log in to your Cloudflare Zero Trust dashboard"
-echo -e "2. Create a new tunnel and copy the token"
-echo -e "3. Update the CLOUDFLARE_TOKEN in the .env file"
-echo -e "4. Create DNS records in Cloudflare for:"
-echo -e "   - ${KIBANA_DOMAIN}"
-echo -e "   - ${FLEET_DOMAIN}"
-echo -e "5. Access Nginx Proxy Manager at http://localhost:81"
-echo -e "6. Create proxy hosts for Kibana and Fleet Server"
-echo -e "7. Restart the services:"
-echo -e "   $DOCKER_COMPOSE_CMD down && $DOCKER_COMPOSE_CMD up -d" 
+echo -e "1. Access Nginx Proxy Manager at http://localhost:81"
+echo -e "2. Create proxy hosts for Kibana and Fleet Server"
+echo -e "3. Restart the services:"
+echo -e "   $DOCKER_COMPOSE_CMD down && $DOCKER_COMPOSE_CMD up -d"
+
+# Save the credentials to a file for reference
+cat > credentials.txt << EOL
+Elastic Stack Credentials:
+------------------------
+Username: elastic
+Password: ${ELASTIC_PASSWORD}
+
+Nginx Proxy Manager Credentials:
+-----------------------------
+Email: admin@${DOMAIN}
+Password: ${NPM_ADMIN_PASSWORD}
+
+Domains:
+-------
+Kibana: ${KIBANA_DOMAIN}
+Fleet Server: ${FLEET_DOMAIN}
+
+Cloudflare Tunnel:
+----------------
+Tunnel ID: ${TUNNEL_ID}
+Tunnel Name: ${TUNNEL_NAME}
+EOL
+
+echo -e "\n${GREEN}Credentials have been saved to credentials.txt${NC}" 
