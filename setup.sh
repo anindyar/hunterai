@@ -67,7 +67,7 @@ done
 
 # Get domain name from user
 while true; do
-    read -p "Enter your domain name (e.g., example.com): " DOMAIN
+    read -p "Enter your domain name (e.g., example.com or sub.example.com): " DOMAIN
     if [[ -n "$DOMAIN" ]]; then
         break
     else
@@ -75,9 +75,15 @@ while true; do
     fi
 done
 
+# Extract the base domain (last two parts) for subdomain creation
+BASE_DOMAIN=$(echo $DOMAIN | rev | cut -d. -f1,2 | rev)
+if [[ "$DOMAIN" != "$BASE_DOMAIN" ]]; then
+    echo -e "${YELLOW}Detected subdomain in input. Using base domain: ${BASE_DOMAIN}${NC}"
+fi
+
 # Create subdomains
-KIBANA_DOMAIN="kibana.${DOMAIN}"
-FLEET_DOMAIN="fleet.${DOMAIN}"
+KIBANA_DOMAIN="kibana.${BASE_DOMAIN}"
+FLEET_DOMAIN="fleet.${BASE_DOMAIN}"
 
 # Cloudflare setup
 echo -e "${YELLOW}Setting up Cloudflare...${NC}"
@@ -122,13 +128,13 @@ FLEET_SERVER_HOST=${FLEET_DOMAIN}
 
 # Cloudflare Configuration
 CLOUDFLARE_TOKEN=${TUNNEL_TOKEN}
-CLOUDFLARE_DOMAIN=${DOMAIN}
+CLOUDFLARE_DOMAIN=${BASE_DOMAIN}
 KIBANA_DOMAIN=${KIBANA_DOMAIN}
 FLEET_DOMAIN=${FLEET_DOMAIN}
 TUNNEL_ID=${TUNNEL_ID}
 
 # Nginx Proxy Manager Configuration
-NPM_ADMIN_EMAIL=admin@${DOMAIN}
+NPM_ADMIN_EMAIL=admin@${BASE_DOMAIN}
 NPM_ADMIN_PASSWORD=${NPM_ADMIN_PASSWORD}
 EOL
     echo -e "${GREEN}Created .env file with generated credentials.${NC}"
@@ -155,8 +161,23 @@ chmod -R 777 data/elasticsearch
 echo -e "${YELLOW}Pulling Docker images...${NC}"
 $DOCKER_COMPOSE_CMD pull
 
-# Start the services
-echo -e "${YELLOW}Starting services...${NC}"
+# Start Elasticsearch first to create service account
+echo -e "${YELLOW}Starting Elasticsearch...${NC}"
+$DOCKER_COMPOSE_CMD up -d elasticsearch
+
+# Wait for Elasticsearch to be ready
+echo -e "${YELLOW}Waiting for Elasticsearch to be ready...${NC}"
+sleep 30
+
+# Create Kibana service account and get token
+echo -e "${YELLOW}Creating Kibana service account...${NC}"
+KIBANA_SERVICE_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-service-tokens create elastic/kibana kibana-token | grep "SERVICE_TOKEN" | awk '{print $3}')
+
+# Update .env with service account token
+sed -i "s|KIBANA_PASSWORD=.*|KIBANA_SERVICE_TOKEN=${KIBANA_SERVICE_TOKEN}|" .env
+
+# Start the remaining services
+echo -e "${YELLOW}Starting remaining services...${NC}"
 $DOCKER_COMPOSE_CMD up -d
 
 # Wait for services to be ready
@@ -174,7 +195,7 @@ echo -e "Elastic Stack:"
 echo -e "Username: elastic"
 echo -e "Password: ${ELASTIC_PASSWORD}"
 echo -e "\nNginx Proxy Manager:"
-echo -e "Email: admin@${DOMAIN}"
+echo -e "Email: admin@${BASE_DOMAIN}"
 echo -e "Password: ${NPM_ADMIN_PASSWORD}"
 
 echo -e "\n${YELLOW}Next steps:${NC}"
@@ -192,7 +213,7 @@ Password: ${ELASTIC_PASSWORD}
 
 Nginx Proxy Manager Credentials:
 -----------------------------
-Email: admin@${DOMAIN}
+Email: admin@${BASE_DOMAIN}
 Password: ${NPM_ADMIN_PASSWORD}
 
 Domains:
