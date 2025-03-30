@@ -14,11 +14,41 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
+# Check if Docker Compose is installed and determine the command
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+else
+    echo -e "${RED}Neither 'docker-compose' nor 'docker compose' is available. Please install Docker Compose first.${NC}"
     exit 1
 fi
+
+# Get Elastic Stack version
+echo -e "${YELLOW}Available Elastic Stack versions:${NC}"
+echo -e "1. 8.17.0 (Latest stable)"
+echo -e "2. 8.16.0"
+echo -e "3. 8.15.0"
+echo -e "4. Custom version"
+
+while true; do
+    read -p "Select Elastic Stack version (1-4): " VERSION_CHOICE
+    case $VERSION_CHOICE in
+        1) ELASTIC_VERSION="8.17.0"; break ;;
+        2) ELASTIC_VERSION="8.16.0"; break ;;
+        3) ELASTIC_VERSION="8.15.0"; break ;;
+        4) 
+            read -p "Enter custom version (e.g., 8.17.0): " CUSTOM_VERSION
+            if [[ $CUSTOM_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                ELASTIC_VERSION=$CUSTOM_VERSION
+                break
+            else
+                echo -e "${RED}Invalid version format. Please use format like 8.17.0${NC}"
+            fi
+            ;;
+        *) echo -e "${RED}Invalid choice. Please select 1-4.${NC}" ;;
+    esac
+done
 
 # Function to validate domain name
 validate_domain() {
@@ -57,6 +87,7 @@ if [ ! -f .env ]; then
     
     cat > .env << EOL
 # Elastic Stack Configuration
+ELASTIC_VERSION=${ELASTIC_VERSION}
 ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
 KIBANA_PASSWORD=${KIBANA_PASSWORD}
 FLEET_SERVER_TOKEN=${FLEET_SERVER_TOKEN}
@@ -88,11 +119,11 @@ chmod -R 777 data/elasticsearch
 
 # Pull Docker images
 echo -e "${YELLOW}Pulling Docker images...${NC}"
-docker-compose pull
+$DOCKER_COMPOSE_CMD pull
 
 # Start the services
 echo -e "${YELLOW}Starting services...${NC}"
-docker-compose up -d
+$DOCKER_COMPOSE_CMD up -d
 
 # Wait for services to be ready
 echo -e "${YELLOW}Waiting for services to be ready...${NC}"
@@ -122,4 +153,4 @@ echo -e "   - ${FLEET_DOMAIN}"
 echo -e "5. Access Nginx Proxy Manager at http://localhost:81"
 echo -e "6. Create proxy hosts for Kibana and Fleet Server"
 echo -e "7. Restart the services:"
-echo -e "   docker-compose down && docker-compose up -d" 
+echo -e "   $DOCKER_COMPOSE_CMD down && $DOCKER_COMPOSE_CMD up -d" 
