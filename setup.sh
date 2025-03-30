@@ -184,6 +184,9 @@ sed -i "s/FLEET_SERVER_TOKEN=.*/FLEET_SERVICE_TOKEN=${FLEET_SERVICE_TOKEN}/" .en
 echo "FLEET_ENROLLMENT_TOKEN=${FLEET_ENROLLMENT_TOKEN}" >> .env
 
 # Create Kibana configuration file with service account token
+# Generate a random 32-character encryption key
+ENCRYPTION_KEY=$(openssl rand -hex 16)
+
 cat > data/kibana/config/kibana.yml << EOL
 server.name: kibana
 server.host: "0.0.0.0"
@@ -197,8 +200,8 @@ monitoring.ui.container.logstash.enabled: true
 monitoring.ui.container.beats.enabled: true
 
 xpack.security.enabled: true
-xpack.security.encryptionKey: "${KIBANA_SERVICE_TOKEN:0:32}"
-xpack.encryptedSavedObjects.encryptionKey: "${KIBANA_SERVICE_TOKEN:0:32}"
+xpack.security.encryptionKey: "${ENCRYPTION_KEY}"
+xpack.encryptedSavedObjects.encryptionKey: "${ENCRYPTION_KEY}"
 EOL
 
 # Start the remaining services
