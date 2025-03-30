@@ -187,8 +187,6 @@ echo "FLEET_ENROLLMENT_TOKEN=${FLEET_ENROLLMENT_TOKEN}" >> .env
 cat > data/kibana/config/kibana.yml << EOL
 server.name: kibana
 server.host: "0.0.0.0"
-server.basePath: ""
-server.rewriteBasePath: false
 server.port: 5601
 
 elasticsearch.hosts: ["http://elasticsearch:9200"]
@@ -201,6 +199,10 @@ monitoring.ui.container.beats.enabled: true
 xpack.security.enabled: true
 xpack.security.encryptionKey: "${KIBANA_SERVICE_TOKEN:0:32}"
 xpack.encryptedSavedObjects.encryptionKey: "${KIBANA_SERVICE_TOKEN:0:32}"
+
+# Node.js options
+node.options:
+  - --openssl-legacy-provider
 EOL
 
 # Start the remaining services
