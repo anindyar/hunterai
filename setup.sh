@@ -199,10 +199,6 @@ monitoring.ui.container.beats.enabled: true
 xpack.security.enabled: true
 xpack.security.encryptionKey: "${KIBANA_SERVICE_TOKEN:0:32}"
 xpack.encryptedSavedObjects.encryptionKey: "${KIBANA_SERVICE_TOKEN:0:32}"
-
-# Node.js options
-node.options:
-  - --openssl-legacy-provider
 EOL
 
 # Start the remaining services
