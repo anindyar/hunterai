@@ -53,8 +53,8 @@ done
 # Function to validate domain name
 validate_domain() {
     local domain=$1
-    # Updated regex to handle subdomains and more valid domain formats
-    if [[ $domain =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9](?:\.[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])*$ ]]; then
+    # Very basic domain validation
+    if [[ "$domain" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$ ]]; then
         return 0
     else
         return 1
