@@ -114,7 +114,6 @@ if [ ! -f .env ]; then
     
     # Generate random passwords and tokens
     ELASTIC_PASSWORD=$(openssl rand -base64 32)
-    KIBANA_PASSWORD=$(openssl rand -base64 32)
     FLEET_SERVER_TOKEN=$(openssl rand -base64 32)
     NPM_ADMIN_PASSWORD=$(openssl rand -base64 32)
     
@@ -122,7 +121,6 @@ if [ ! -f .env ]; then
 # Elastic Stack Configuration
 ELASTIC_VERSION=${ELASTIC_VERSION}
 ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-KIBANA_PASSWORD=${KIBANA_PASSWORD}
 FLEET_SERVER_TOKEN=${FLEET_SERVER_TOKEN}
 FLEET_SERVER_HOST=${FLEET_DOMAIN}
 
@@ -173,8 +171,28 @@ sleep 30
 echo -e "${YELLOW}Creating Kibana service account...${NC}"
 KIBANA_SERVICE_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-service-tokens create elastic/kibana kibana-token | grep "SERVICE_TOKEN" | awk '{print $3}')
 
-# Update .env with service account token
-sed -i "s|KIBANA_PASSWORD=.*|KIBANA_SERVICE_TOKEN=${KIBANA_SERVICE_TOKEN}|" .env
+# Create Kibana config directory if it doesn't exist
+mkdir -p data/kibana/config
+
+# Create Kibana configuration file with service account token
+cat > data/kibana/config/kibana.yml << EOL
+server.name: kibana
+server.host: "0.0.0.0"
+server.basePath: ""
+server.rewriteBasePath: false
+server.port: 5601
+
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+elasticsearch.serviceAccountToken: "${KIBANA_SERVICE_TOKEN}"
+
+monitoring.ui.container.elasticsearch.enabled: true
+monitoring.ui.container.logstash.enabled: true
+monitoring.ui.container.beats.enabled: true
+
+xpack.security.enabled: true
+xpack.security.encryptionKey: "${KIBANA_SERVICE_TOKEN:0:32}"
+xpack.encryptedSavedObjects.encryptionKey: "${KIBANA_SERVICE_TOKEN:0:32}"
+EOL
 
 # Start the remaining services
 echo -e "${YELLOW}Starting remaining services...${NC}"
