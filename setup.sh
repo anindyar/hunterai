@@ -119,38 +119,15 @@ mkdir -p cloudflared
 echo -e "${YELLOW}Setting proper permissions...${NC}"
 chmod -R 777 data/elasticsearch
 
-# Pull Docker images
-echo -e "${YELLOW}Pulling Docker images...${NC}"
-$DOCKER_COMPOSE_CMD pull
+# Generate initial passwords and tokens
+ELASTIC_PASSWORD=$(openssl rand -base64 32)
+NPM_ADMIN_PASSWORD=$(openssl rand -base64 32)
 
-# Start Elasticsearch first to create service accounts
-echo -e "${YELLOW}Starting Elasticsearch...${NC}"
-$DOCKER_COMPOSE_CMD up -d elasticsearch
-
-# Wait for Elasticsearch to be ready
-echo -e "${YELLOW}Waiting for Elasticsearch to be ready...${NC}"
-sleep 30
-
-# Create service accounts and get tokens
-echo -e "${YELLOW}Creating service accounts...${NC}"
-
-# Create Kibana service account token
-KIBANA_SERVICE_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-service-tokens create elastic/kibana kibana-token | grep "SERVICE_TOKEN" | awk '{print $3}')
-
-# Create Fleet service account token
-FLEET_SERVICE_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-service-tokens create elastic/fleet fleet-token | grep "SERVICE_TOKEN" | awk '{print $3}')
-
-# Create Fleet enrollment token
-FLEET_ENROLLMENT_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s fleet-server | grep "token" | awk '{print $3}')
-
-# Update .env file with service tokens
+# Create initial .env file
 cat > .env << EOL
 # Elastic Stack Configuration
 ELASTIC_VERSION=${ELASTIC_VERSION}
 ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-KIBANA_SERVICE_TOKEN=${KIBANA_SERVICE_TOKEN}
-FLEET_SERVICE_TOKEN=${FLEET_SERVICE_TOKEN}
-FLEET_ENROLLMENT_TOKEN=${FLEET_ENROLLMENT_TOKEN}
 FLEET_SERVER_HOST=${FLEET_DOMAIN}
 
 # Cloudflare Configuration
@@ -163,6 +140,38 @@ TUNNEL_ID=${TUNNEL_ID}
 # Nginx Proxy Manager Configuration
 NPM_ADMIN_EMAIL=admin@${BASE_DOMAIN}
 NPM_ADMIN_PASSWORD=${NPM_ADMIN_PASSWORD}
+EOL
+
+# Start Elasticsearch first
+echo -e "${YELLOW}Starting Elasticsearch...${NC}"
+$DOCKER_COMPOSE_CMD up -d elasticsearch
+
+# Wait for Elasticsearch to be ready
+echo -e "${YELLOW}Waiting for Elasticsearch to be ready...${NC}"
+until curl -s -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -q '"status":"green\|yellow"'; do
+    echo -e "${YELLOW}Waiting for Elasticsearch...${NC}"
+    sleep 5
+done
+
+# Create service accounts and get tokens
+echo -e "${YELLOW}Creating service accounts...${NC}"
+
+# Create Kibana service account token
+KIBANA_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/kibana/credential/token | jq -r '.token.value')
+
+# Create Fleet service account token
+FLEET_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet/credential/token | jq -r '.token.value')
+
+# Create Fleet enrollment token
+FLEET_ENROLLMENT_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet-server/credential/token | jq -r '.token.value')
+
+# Update .env with service tokens
+cat >> .env << EOL
+
+# Service Account Tokens
+KIBANA_SERVICE_TOKEN=${KIBANA_SERVICE_TOKEN}
+FLEET_SERVICE_TOKEN=${FLEET_SERVICE_TOKEN}
+FLEET_ENROLLMENT_TOKEN=${FLEET_ENROLLMENT_TOKEN}
 EOL
 
 # Start the remaining services
@@ -186,12 +195,6 @@ echo -e "Password: ${ELASTIC_PASSWORD}"
 echo -e "\nNginx Proxy Manager:"
 echo -e "Email: admin@${BASE_DOMAIN}"
 echo -e "Password: ${NPM_ADMIN_PASSWORD}"
-
-echo -e "\n${YELLOW}Next steps:${NC}"
-echo -e "1. Access Nginx Proxy Manager at http://localhost:81"
-echo -e "2. Create proxy hosts for Kibana and Fleet Server"
-echo -e "3. Restart the services:"
-echo -e "   $DOCKER_COMPOSE_CMD down && $DOCKER_COMPOSE_CMD up -d"
 
 # Save the credentials to a file for reference
 cat > credentials.txt << EOL
