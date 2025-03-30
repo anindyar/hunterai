@@ -158,19 +158,19 @@ echo -e "${YELLOW}Creating service accounts...${NC}"
 
 # Create Kibana service account
 echo -e "${YELLOW}Creating Kibana service account...${NC}"
-curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/kibana -d '{
+curl -X PUT -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/kibana/kibana -d '{
   "roles": [ "kibana_system" ]
 }'
 
 # Create Fleet service account
 echo -e "${YELLOW}Creating Fleet service account...${NC}"
-curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet -d '{
+curl -X PUT -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/fleet/fleet -d '{
   "roles": [ "fleet_system" ]
 }'
 
 # Create Fleet Server service account
 echo -e "${YELLOW}Creating Fleet Server service account...${NC}"
-curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet-server -d '{
+curl -X PUT -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/fleet-server/fleet-server -d '{
   "roles": [ "fleet_server" ]
 }'
 
@@ -178,15 +178,15 @@ sleep 5
 
 # Create Kibana service account token
 echo -e "${YELLOW}Creating Kibana service token...${NC}"
-KIBANA_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/kibana/credential/token | jq -r '.token.value')
+KIBANA_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/kibana/kibana/credential/token/create | jq -r '.token.value')
 
 # Create Fleet service account token
 echo -e "${YELLOW}Creating Fleet service token...${NC}"
-FLEET_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet/credential/token | jq -r '.token.value')
+FLEET_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/fleet/fleet/credential/token/create | jq -r '.token.value')
 
 # Create Fleet enrollment token
 echo -e "${YELLOW}Creating Fleet enrollment token...${NC}"
-FLEET_ENROLLMENT_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet-server/credential/token | jq -r '.token.value')
+FLEET_ENROLLMENT_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/fleet-server/fleet-server/credential/token/create | jq -r '.token.value')
 
 # Verify tokens were created
 if [ -z "$KIBANA_SERVICE_TOKEN" ] || [ -z "$FLEET_SERVICE_TOKEN" ] || [ -z "$FLEET_ENROLLMENT_TOKEN" ]; then
