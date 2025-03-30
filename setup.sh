@@ -108,45 +108,9 @@ echo -e "${YELLOW}Creating DNS records...${NC}"
 cloudflared tunnel route dns $TUNNEL_ID $KIBANA_DOMAIN
 cloudflared tunnel route dns $TUNNEL_ID $FLEET_DOMAIN
 
-# Create .env file if it doesn't exist
-if [ ! -f .env ]; then
-    echo -e "${YELLOW}Creating .env file...${NC}"
-    
-    # Generate random passwords and tokens
-    ELASTIC_PASSWORD=$(openssl rand -base64 32)
-    FLEET_SERVER_TOKEN=$(openssl rand -base64 32)
-    NPM_ADMIN_PASSWORD=$(openssl rand -base64 32)
-    
-    cat > .env << EOL
-# Elastic Stack Configuration
-ELASTIC_VERSION=${ELASTIC_VERSION}
-ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-FLEET_SERVER_TOKEN=${FLEET_SERVER_TOKEN}
-FLEET_SERVER_HOST=${FLEET_DOMAIN}
-
-# Cloudflare Configuration
-CLOUDFLARE_TOKEN=${TUNNEL_TOKEN}
-CLOUDFLARE_DOMAIN=${BASE_DOMAIN}
-KIBANA_DOMAIN=${KIBANA_DOMAIN}
-FLEET_DOMAIN=${FLEET_DOMAIN}
-TUNNEL_ID=${TUNNEL_ID}
-
-# Nginx Proxy Manager Configuration
-NPM_ADMIN_EMAIL=admin@${BASE_DOMAIN}
-NPM_ADMIN_PASSWORD=${NPM_ADMIN_PASSWORD}
-EOL
-    echo -e "${GREEN}Created .env file with generated credentials.${NC}"
-fi
-
-# Load environment variables
-if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
-fi
-
 # Create necessary directories
 echo -e "${YELLOW}Creating necessary directories...${NC}"
 mkdir -p data/elasticsearch
-mkdir -p data/kibana/config
 mkdir -p data/fleet
 mkdir -p data/npm
 mkdir -p cloudflared
@@ -180,28 +144,25 @@ FLEET_SERVICE_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/ela
 FLEET_ENROLLMENT_TOKEN=$(docker exec elasticsearch /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s fleet-server | grep "token" | awk '{print $3}')
 
 # Update .env file with service tokens
-sed -i "s/FLEET_SERVER_TOKEN=.*/FLEET_SERVICE_TOKEN=${FLEET_SERVICE_TOKEN}/" .env
-echo "FLEET_ENROLLMENT_TOKEN=${FLEET_ENROLLMENT_TOKEN}" >> .env
+cat > .env << EOL
+# Elastic Stack Configuration
+ELASTIC_VERSION=${ELASTIC_VERSION}
+ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+KIBANA_SERVICE_TOKEN=${KIBANA_SERVICE_TOKEN}
+FLEET_SERVICE_TOKEN=${FLEET_SERVICE_TOKEN}
+FLEET_ENROLLMENT_TOKEN=${FLEET_ENROLLMENT_TOKEN}
+FLEET_SERVER_HOST=${FLEET_DOMAIN}
 
-# Create Kibana configuration file with service account token
-# Generate a random 32-character encryption key
-ENCRYPTION_KEY=$(openssl rand -hex 16)
+# Cloudflare Configuration
+CLOUDFLARE_TOKEN=${TUNNEL_TOKEN}
+CLOUDFLARE_DOMAIN=${BASE_DOMAIN}
+KIBANA_DOMAIN=${KIBANA_DOMAIN}
+FLEET_DOMAIN=${FLEET_DOMAIN}
+TUNNEL_ID=${TUNNEL_ID}
 
-cat > data/kibana/config/kibana.yml << EOL
-server.name: kibana
-server.host: "0.0.0.0"
-server.port: 5601
-
-elasticsearch.hosts: ["http://elasticsearch:9200"]
-elasticsearch.serviceAccountToken: "${KIBANA_SERVICE_TOKEN}"
-
-monitoring.ui.container.elasticsearch.enabled: true
-monitoring.ui.container.logstash.enabled: true
-monitoring.ui.container.beats.enabled: true
-
-xpack.security.enabled: true
-xpack.security.encryptionKey: "${ENCRYPTION_KEY}"
-xpack.encryptedSavedObjects.encryptionKey: "${ENCRYPTION_KEY}"
+# Nginx Proxy Manager Configuration
+NPM_ADMIN_EMAIL=admin@${BASE_DOMAIN}
+NPM_ADMIN_PASSWORD=${NPM_ADMIN_PASSWORD}
 EOL
 
 # Start the remaining services
