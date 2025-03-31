@@ -158,7 +158,7 @@ echo -e "${YELLOW}Creating service accounts...${NC}"
 
 # Create Kibana service account
 echo -e "${YELLOW}Creating Kibana service account...${NC}"
-curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/kibana -d '{
+curl -X PUT -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/kibana/kibana -d '{
   "role_descriptors": {
     "kibana_system": {
       "cluster": ["monitor", "manage_ilm", "manage_index_templates", "manage_snapshots", "manage_ml", "monitor_ml", "manage_watcher", "manage_transform", "manage_rollup", "manage_ingest_pipelines", "manage_api_key", "manage_token", "manage_ccr", "manage_ilm", "manage_pipeline", "manage_saml", "manage_service_account", "manage_snapshot_lifecycle", "manage_slm", "manage_token", "manage_user_profile", "manage_watcher", "monitor", "monitor_ml", "monitor_rollup", "monitor_snapshot_restore", "monitor_transform", "read_ccr", "read_ilm", "read_pipeline", "read_slm", "read_snapshot", "read_snapshot_lifecycle", "read_snapshot_restore", "read_transform", "transport_client", "write_snapshot_lifecycle"],
@@ -174,7 +174,7 @@ curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" 
 
 # Create Fleet service account
 echo -e "${YELLOW}Creating Fleet service account...${NC}"
-curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet -d '{
+curl -X PUT -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/fleet/fleet -d '{
   "role_descriptors": {
     "fleet_system": {
       "cluster": ["monitor", "manage_ilm", "manage_index_templates", "manage_snapshots", "manage_ml", "monitor_ml", "manage_watcher", "manage_transform", "manage_rollup", "manage_ingest_pipelines", "manage_api_key", "manage_token", "manage_ccr", "manage_ilm", "manage_pipeline", "manage_saml", "manage_service_account", "manage_snapshot_lifecycle", "manage_slm", "manage_token", "manage_user_profile", "manage_watcher", "monitor", "monitor_ml", "monitor_rollup", "monitor_snapshot_restore", "monitor_transform", "read_ccr", "read_ilm", "read_pipeline", "read_slm", "read_snapshot", "read_snapshot_lifecycle", "read_snapshot_restore", "read_transform", "transport_client", "write_snapshot_lifecycle"],
@@ -190,7 +190,7 @@ curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" 
 
 # Create Fleet Server service account
 echo -e "${YELLOW}Creating Fleet Server service account...${NC}"
-curl -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet-server -d '{
+curl -X PUT -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/fleet-server/fleet-server -d '{
   "role_descriptors": {
     "fleet_server": {
       "cluster": ["monitor", "manage_ilm", "manage_index_templates", "manage_snapshots", "manage_ml", "monitor_ml", "manage_watcher", "manage_transform", "manage_rollup", "manage_ingest_pipelines", "manage_api_key", "manage_token", "manage_ccr", "manage_ilm", "manage_pipeline", "manage_saml", "manage_service_account", "manage_snapshot_lifecycle", "manage_slm", "manage_token", "manage_user_profile", "manage_watcher", "monitor", "monitor_ml", "monitor_rollup", "monitor_snapshot_restore", "monitor_transform", "read_ccr", "read_ilm", "read_pipeline", "read_slm", "read_snapshot", "read_snapshot_lifecycle", "read_snapshot_restore", "read_transform", "transport_client", "write_snapshot_lifecycle"],
@@ -208,15 +208,15 @@ sleep 5
 
 # Create Kibana service account token
 echo -e "${YELLOW}Creating Kibana service token...${NC}"
-KIBANA_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/kibana/credential/token/create | jq -r '.token.value')
+KIBANA_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/kibana/kibana/credential/token/create | jq -r '.token.value')
 
 # Create Fleet service account token
 echo -e "${YELLOW}Creating Fleet service token...${NC}"
-FLEET_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet/credential/token/create | jq -r '.token.value')
+FLEET_SERVICE_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/fleet/fleet/credential/token/create | jq -r '.token.value')
 
 # Create Fleet enrollment token
 echo -e "${YELLOW}Creating Fleet enrollment token...${NC}"
-FLEET_ENROLLMENT_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/elastic/fleet-server/credential/token/create | jq -r '.token.value')
+FLEET_ENROLLMENT_TOKEN=$(curl -s -X POST -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" http://localhost:9200/_security/service/fleet-server/fleet-server/credential/token/create | jq -r '.token.value')
 
 # Verify tokens were created
 if [ -z "$KIBANA_SERVICE_TOKEN" ] || [ -z "$FLEET_SERVICE_TOKEN" ] || [ -z "$FLEET_ENROLLMENT_TOKEN" ]; then
